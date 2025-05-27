@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>모솔탈출! AI 카톡 코치 (ChatGPT)</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    textarea, select, input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      font-size: 1em;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 12px 20px;
+      background-color: #10a37f;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1em;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #0c7a60;
+    }
+    .loader {
+      display: none;
+      margin: 20px auto;
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #10a37f;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .results-area {
+      margin-top: 20px;
+    }
+    .card {
+      background: #ffffff;
+      border-left: 6px solid #10a37f;
+      margin-bottom: 15px;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .card h4 {
+      margin: 0 0 10px;
+      font-size: 1.1em;
+    }
+    .card p {
+      margin: 0;
+      line-height: 1.5em;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>💌 AI 카톡 코치 (ChatGPT)</h2>
+
+    <label><input type="checkbox" id="adminToggle"> 관리자 모드</label>
+
+    <div id="adminSection" style="display:none;">
+      <h3>ChatGPT 지시문(프롬프트) 설정</h3>
+      <textarea id="adminPrompt" placeholder="예: 너는 친절하고 센스 있는 연애 상담가야. 말투는 ..."></textarea>
+      <button onclick="savePrompt()">프롬프트 저장</button>
+    </div>
+
+    <div id="userSection">
+      <textarea id="herMessage" placeholder="그녀의 메시지를 입력하세요. 예: 오늘 뭐했어?"></textarea>
+      <textarea id="chatHistory" placeholder="(선택사항) 최근 대화 흐름을 입력해 주세요."></textarea>
+
+      <select id="toneSelector">
+        <option value="">-- 말투 스타일 선택 --</option>
+        <option value="귀엽게">귀엽게</option>
+        <option value="유머 있게">유머 있게</option>
+        <option value="진지하게">진지하게</option>
+        <option value="다정하게">다정하게</option>
+      </select>
+
+      <select id="languageSelector">
+        <option value="한국어">한국어</option>
+        <option value="영어">영어</option>
+      </select>
+
+      <button onclick="getSuggestions()">답장 추천받기</button>
+
+      <select id="situationSelector">
+        <option value="">-- 선톡 상황 선택 --</option>
+        <option value="소개팅/첫 만남 후">소개팅/첫 만남 후</option>
+        <option value="동호회/모임에서 만난 후">동호회/모임에서 만난 후</option>
+        <option value="우연히 알게 된 사람에게">우연히 알게 된 사람에게</option>
+        <option value="오랜만에 연락할 때">오랜만에 연락할 때</option>
+        <option value="일상적인 안부/인사">일상적인 안부/인사</option>
+      </select>
+
+      <button onclick="getPreemptiveMessage()">선톡 추천받기</button>
+    </div>
+
+    <div class="loader" id="loader"></div>
+    <div class="results-area" id="results"></div>
+  </div>
+
+  <script>
+    document.getElementById('adminToggle').addEventListener('change', (e) => {
+      const isAdmin = e.target.checked;
+      document.getElementById('adminSection').style.display = isAdmin ? "block" : "none";
+      document.getElementById('userSection').style.display = isAdmin ? "none" : "block";
+    });
+
+    function savePrompt() {
+      const prompt = document.getElementById("adminPrompt").value.trim();
+      if (prompt) {
+        localStorage.setItem("chatgpt_prompt", prompt);
+        alert("프롬프트가 저장되었습니다!");
+      }
+    }
+
+    function getStoredPrompt() {
+      return localStorage.getItem("chatgpt_prompt") || "너는 센스 있는 연애 코치야. 답변은 자연스럽고 매력적으로 해줘.";
+    }
+
+    async function callChatGPT(prompt) {
+      const res = await fetch("/api/chatgpt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      if (!data.result) throw new Error("ChatGPT 응답 없음");
+      return data.result;
+    }
+
+    function displayAsCards(text) {
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "";
+      const lines = text.split(/\n(?=\d\.\s|\*\*|•|\-)/g);
+      lines.forEach((line, index) => {
+        if (line.trim()) {
+          const card = document.createElement("div");
+          card.className = "card";
+          const emoji = ["💡", "✨", "🔥", "🧡", "✅", "❗", "💬", "📌"][index % 8];
+          const parts = line.split(/[:：]\s*/);
+          const title = parts[0]?.trim() || "추천";
+          const content = parts.slice(1).join(": ") || line;
+          card.innerHTML = `<h4>${emoji} ${title}</h4><p>${content.trim()}</p>`;
+          resultsDiv.appendChild(card);
+        }
+      });
+    }
+
+    async function getSuggestions() {
+      const herMessage = document.getElementById("herMessage").value.trim();
+      const chatHistory = document.getElementById("chatHistory").value.trim();
+      const tone = document.getElementById("toneSelector").value;
+      const language = document.getElementById("languageSelector").value;
+      const loader = document.getElementById("loader");
+      const results = document.getElementById("results");
+
+      if (!herMessage) return alert("카톡 메시지를 입력해주세요.");
+
+      loader.style.display = "block";
+      results.innerHTML = "";
+
+      let prompt = getStoredPrompt() + "\n";
+      if (tone) prompt += `말투 스타일: ${tone}\n`;
+      if (language === "영어") prompt += `답변은 영어로 해줘.\n`;
+      if (chatHistory) prompt += `최근 대화:\n${chatHistory}\n`;
+      prompt += `여자의 메시지: "${herMessage}"\n센스 있는 답변 3가지 제안해줘.`;
+
+      try {
+        const reply = await callChatGPT(prompt);
+        displayAsCards(reply);
+      } catch (err) {
+        results.innerHTML = `<p style="color:red;">오류: ${err.message}</p>`;
+      } finally {
+        loader.style.display = "none";
+      }
+    }
+
+    async function getPreemptiveMessage() {
+      const situation = document.getElementById("situationSelector").value;
+      const loader = document.getElementById("loader");
+      const results = document.getElementById("results");
+
+      if (!situation) return alert("상황을 선택해주세요.");
+
+      loader.style.display = "block";
+      results.innerHTML = "";
+
+      const prompt = getStoredPrompt() + `\n상황: ${situation}\n선톡으로 보낼 수 있는 메시지 2개와 주의점 1개를 알려줘.`;
+
+      try {
+        const reply = await callChatGPT(prompt);
+        displayAsCards(reply);
+      } catch (err) {
+        results.innerHTML = `<p style="color:red;">오류: ${err.message}</p>`;
+      } finally {
+        loader.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>
