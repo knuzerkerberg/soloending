@@ -4,6 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 요청 본문 수동 파싱
     const buffers = [];
     for await (const chunk of req) {
       buffers.push(chunk);
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ result: content });
   } catch (err) {
-    console.error(err);
+    console.error("❗ ChatGPT API 에러:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
