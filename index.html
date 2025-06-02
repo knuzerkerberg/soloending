@@ -149,8 +149,12 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })
       });
+
       const data = await res.json();
-      if (!data.result) throw new Error("ChatGPT 응답 없음");
+      if (!data || !data.result) {
+        const errorMessage = data?.error || "ChatGPT 응답 없음";
+        throw new Error(errorMessage);
+      }
       return data.result;
     }
 
@@ -180,7 +184,10 @@
       const loader = document.getElementById("loader");
       const results = document.getElementById("results");
 
-      if (!herMessage) return alert("카톡 메시지를 입력해주세요.");
+      if (!herMessage) {
+        results.innerHTML = `<p style="color:red;">⚠️ 카톡 메시지를 입력해 주세요!</p>`;
+        return;
+      }
 
       loader.style.display = "block";
       results.innerHTML = "";
@@ -206,7 +213,10 @@
       const loader = document.getElementById("loader");
       const results = document.getElementById("results");
 
-      if (!situation) return alert("상황을 선택해주세요.");
+      if (!situation) {
+        results.innerHTML = `<p style="color:red;">⚠️ 상황을 선택해 주세요!</p>`;
+        return;
+      }
 
       loader.style.display = "block";
       results.innerHTML = "";
