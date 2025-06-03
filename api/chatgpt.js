@@ -4,24 +4,25 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 요청 본문 수동 파싱
     const buffers = [];
     for await (const chunk of req) {
       buffers.push(chunk);
     }
     const body = JSON.parse(Buffer.concat(buffers).toString());
+
     const prompt = body.prompt;
 
-    // 환경변수에서 API 키와 Project ID 가져오기
-    const apiKey = process.env.OPENAI_API_KEY;
-    const projectId = process.env.OPENAI_PROJECT_ID;  // 👈 반드시 필요
+    if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_PROJECT_ID) {
+      return res.status(500).json({ error: "API 키 또는 Project ID가 설정되지 않았습니다." });
+    }
 
-    // 요청 보내기
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-        "OpenAI-Project": projectId  // 👈 프로젝트 키를 사용할 때는 꼭 필요!
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "OpenAI-Project": process.env.OPENAI_PROJECT_ID
       },
       body: JSON.stringify({
         model: "gpt-3.5-turbo",
@@ -32,13 +33,12 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // 로그 출력 (디버깅용)
-    console.log("🔎 OpenAI 응답:", JSON.stringify(data, null, 2));
-
+    // OpenAI 응답이 예상과 다를 경우 처리
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error("🔍 OpenAI 응답 오류:", JSON.stringify(data, null, 2));
       return res.status(500).json({
         error: "ChatGPT 응답 형식 오류",
-        detail: data.error?.message || "응답 형식이 예상과 다릅니다"
+        detail: data.error?.message || "응답 형식이 예상과 다릅니다."
       });
     }
 
