@@ -11,11 +11,17 @@ export default async function handler(req, res) {
     const body = JSON.parse(Buffer.concat(buffers).toString());
     const prompt = body.prompt;
 
+    // 환경변수에서 API 키와 Project ID 가져오기
+    const apiKey = process.env.OPENAI_API_KEY;
+    const projectId = process.env.OPENAI_PROJECT_ID;  // 👈 반드시 필요
+
+    // 요청 보내기
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        "Authorization": `Bearer ${apiKey}`,
+        "OpenAI-Project": projectId  // 👈 프로젝트 키를 사용할 때는 꼭 필요!
       },
       body: JSON.stringify({
         model: "gpt-3.5-turbo",
@@ -26,7 +32,7 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // 🔍 로그 추가
+    // 로그 출력 (디버깅용)
     console.log("🔎 OpenAI 응답:", JSON.stringify(data, null, 2));
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
